@@ -7,3 +7,6 @@ node_modules
 .vercel
 .next
 .output
+
+# Local Netlify folder
+.netlify

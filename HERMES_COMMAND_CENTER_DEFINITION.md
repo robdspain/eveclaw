@@ -36,17 +36,39 @@ The product is not a new model provider, hosted AI service, or API-key proxy. Ne
        v
  Netlify Next.js app
        |
-       | short-lived bridge ticket; no provider secrets
+       | HTTPS over Tailscale, Bearer API_SERVER_KEY (scoped, rotated)
        v
- Hermes Bridge on Mac mini (Tailscale/private)
+ Hermes native `api_server` platform on Mac mini (port 8642, localhost-bound)
+   /v1/runs, /v1/runs/{id}/events (SSE), /v1/runs/{id}/approval|steer|stop,
+   /api/sessions (threads), /v1/models, /v1/capabilities, /health
        |
-       | Hermes gateway/session APIs
        v
  Hermes runtime
    |       |       |       |
  Claude  Codex  Gemini  OAuth/MCP/local tools
  OAuth   OAuth   agy     Google/GitHub/etc.
 ```
+
+### Verified fact (2026-09-13): no custom bridge server is needed
+
+Hermes already ships a production-grade local OpenAI-compatible + native run/session API as the built-in `api_server` gateway platform (`gateway/platforms/api_server.py`, `api_server_runs.py`, `api_server_room_dispatch.py`). It is not a guess or a to-be-designed surface — it is real, shipping code with:
+
+- `POST /v1/runs`, `GET /v1/runs/{run_id}`, `GET /v1/runs/{run_id}/events` (SSE: tool.started/completed, reasoning.available, subagent.start/complete, approval events)
+- `POST /v1/runs/{run_id}/approval|steer|stop` — exactly the confirm/steer/cancel semantics this project needs
+- `/api/sessions` CRUD + fork + chat + chat/stream — this **is** the thread model; no separate thread abstraction needs to be invented
+- `/v1/models`, `/v1/capabilities`, `/health`, `/health/detailed` for discovery
+- Bearer auth via `API_SERVER_KEY`; binds to `127.0.0.1:8642` by default (safe to put behind Tailscale instead of exposing publicly)
+- Idempotency keys, durable run status persistence, room-scoped grant tokens for constrained multi-tenant access
+
+**Decision:** the "Hermes Bridge" in this document is not a service we build from scratch. It is:
+
+1. `api_server` enabled in `~/.hermes/config.yaml` with a strong `API_SERVER_KEY`.
+2. The gateway process reachable only over Tailscale (`100.77.85.60:8642`), never a public port.
+3. A thin typed Node client in the web app's server routes that calls `/v1/runs*` and `/api/sessions*` directly.
+4. Convex stores durable thread/message/run **projections** synced from Hermes responses/SSE — Convex is not the run authority, Hermes is.
+
+This removes an entire custom bridge-server milestone from the delivery plan (see Milestone B below) and replaces it with configuration + a typed client.
+
 
 ### Components
 
@@ -279,7 +301,19 @@ A connector card shows connected, needs reauth, unavailable, or disabled. OAuth 
 
 ## 10. Deployment definition
 
-### Netlify
+### Netlify — live
+
+- Project: `hermes-command-center` (`https://hermes-command-center.netlify.app`), account `robdspain`/Behavior School, linked via `--filter hermes-command-center-web`.
+- Environment variables set (2026-09-13):
+  - `API_SERVER_KEY` — secret, `production` + `deploy-preview` contexts only, matches the key configured in `~/.hermes/config.yaml` `platforms.api_server.extra.api_key_env`.
+  - `HERMES_BRIDGE_URL=http://100.77.85.60:8642` — Tailscale address of the Mac mini's `api_server` platform; not a public endpoint.
+  - `HERMES_EXECUTION_MODE=bridge`
+  - `NEXT_PUBLIC_AGENT_NAME=Hermes`, `NEXT_PUBLIC_OWNER_NAME=Rob`, `NEXT_PUBLIC_APP_NAME=Hermes Command Center`
+- No deploy has been triggered yet; the site is linked and configured but not built/published.
+- `netlify env:set --context all` silently no-ops for `--secret` values; secrets require an explicit `--context production`/`deploy-preview` flag. Confirmed via `netlify env:get ... --context production`.
+
+### Netlify — remaining setup
+
 
 - Deploy `apps/eve` as the web app.
 - Build with Node 24.
