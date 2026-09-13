@@ -1,5 +1,5 @@
 {
-  "name": "eve-agent",
+  "name": "hermes-command-center-web",
   "version": "0.0.0",
   "type": "module",
   "imports": {

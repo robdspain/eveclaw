@@ -1,90 +1,43 @@
-# eveclaw
+# Hermes Command Center
 
-A personal AI assistant ("Eve") in the spirit of OpenClaw — proactive, always-on, and reachable from the web or Telegram — plus a **builder** that deploys configured copies of her into anyone's Vercel account in one click. Built on the durable [eve framework](https://eve.dev) with a Next.js chat UI styled with Whop's [Frosted UI](https://github.com/whopio/frosted-ui) design system. Turborepo monorepo: the agent app lives in `apps/eve`, the agent builder in `apps/builder`.
+A personal, self-hosted AI command center for Rob, based on the excellent [EveClaw](https://github.com/michaelshimeles/eveclaw) interface patterns and adapted to run through Hermes on the Mac mini.
 
-## What it does
+This fork is intentionally becoming its own product. The web app provides the conversation and management experience; Hermes remains the execution layer for models, tools, scheduled jobs, and OAuth-backed connectors.
 
-**Chat**
+## Product direction
 
-- **Web chat** — threads (rename/pin/delete), streaming responses, file attachments, slash-command prompts, model picker, and HTML artifact previews.
-- **Command palette (⌘K)** — jump to threads, start a new chat, open the manage page, toggle notifications.
-- **Full-text search** — sidebar search matches message content across all threads, not just titles.
-- **Message actions** — copy a reply, edit & resend, regenerate the last reply, or fork a thread from any message.
-- **Telegram channel** — private-DM-only bot with a user-id allowlist.
+- Grok-style agent roster with separate persistent threads
+- Streaming conversations, search, command palette, model/agent picker
+- Scheduled tasks, reminders, run history, and live status
+- Connector and skill management
+- Mobile-first PWA access from the iPhone
+- Neo animated face and voice interaction as a first-class surface
+- Convex for durable application state
+- Netlify for web deployment
+- Hermes bridge on the Mac mini for execution
 
-**Proactive**
+## Subscription-only boundary
 
-- **Reminders & schedules** — ask Eve for one-off or recurring (cron) reminders; they fire into a new thread.
-- **Event triggers** — Eve can mint webhook URLs so external services can start conversations.
-- **Push notifications** — browser web-push for proactive threads, plus unread indicators in the sidebar.
+No model calls are made from the browser, Netlify, or Convex. The Mac mini uses subscription/OAuth-backed sessions where available:
 
-**Agent capabilities**
+- Claude OAuth subscription
+- ChatGPT/Codex OAuth subscription
+- Gemini through the authenticated Antigravity CLI
+- Google/GitHub/Notion and similar OAuth connectors
+- SuperGrok only through supported subscription OAuth; never the stored xAI API key
 
-- **Long-term memory** — Supermemory-backed remember/forget/search tools with nightly consolidation and a profile summary injected each turn.
-- **App integrations** — Composio connections (Gmail, GitHub, Notion, Linear, …) with a UI to connect/disconnect apps.
-- **Chat-created skills** — Eve can write, list, and delete her own skills at runtime; manage them from the UI.
-- **File sharing** — Eve uploads sandbox files to Blob storage and hands back a public link.
-- **Receipt tracking** — log/query/summarize spending, backed by Neon.
-- **Browser control** — sandboxed browser extension for web tasks.
-
-**Manage page** — `/manage` shows reminders (with run history), webhooks, memories, connections, and skills in one place.
-
-**Agent builder (`apps/builder`)** — create a configured Eve and deploy it into **your** Vercel account, then update it later when the template changes:
-
-- **Create** — wizard for name, personality, capabilities, channels, custom cron jobs, and editable generated instructions; one click deploys into the owner's Vercel account.
-- **Template** — the live `apps/eve` source, assembled at deploy time with feature pruning, so the personal agent and the product never drift. A manifest completeness check fails CI if a new tool isn't mapped to a feature.
-- **Deploy** — Vercel REST API with the user's token: create project → set env vars → deploy inline files → stream build status → health check. Keys pass through in memory and are never stored; VAPID push keys are generated automatically; models bill to the deployer's own AI Gateway (no provider keys). Telegram webhooks register automatically when a bot token is provided.
-- **Update** — each deployment is stamped with a template version (content hash), a monotonic release from `apps/eve/.eve-template-release` (bump that file when shipping changes agents should pick up), and an `eve-builder.json` manifest. When the builder's release is higher, the agent's `/manage` page shows an update banner that deep-links to the builder's `/update` page (not shown on the create home). The owner pastes their Vercel token and clicks once: the builder reads features, instructions, and custom schedules back from the deployed files, reassembles them on the latest template, and redeploys into the same project. Env vars, VAPID keys, storage, chat history, memories, skills, and the URL are preserved. Agents that predate the manifest need one Create-tab redeploy into the existing project before Update is available.
-
-## Structure
-
-```
-apps/eve/         # the agent app (also the builder's deploy template)
-  agent/          # eve agent: channels, tools, skills, schedules, instructions
-  app/            # Next.js web chat UI + API routes (threads, search, update-check, …)
-  components/     # UI components (Frosted UI design system)
-  lib/            # Neon-backed stores (threads, push), Composio connect, web auth
-apps/builder/     # the eveclaw agent builder
-  app/            # create/update UI + API routes (deploy, update, template-version, …)
-  components/     # wizard + update flow
-  lib/            # Vercel API client, feature manifest, assembler, generators
-  scripts/        # manifest completeness check, manual smoke deploy
-```
-
-The Next.js app mounts the agent on the same origin via `withEve` — `/eve/v1/**` routes to the agent service. One dev server, one Vercel deployment.
-
-## Getting started
+## Development
 
 Requires Node 24.
 
 ```bash
 npm install
-cp apps/eve/.env.example apps/eve/.env.local   # then fill in values
-npm run dev   # turbo runs next dev for apps/eve on localhost:3000
+npm run dev
 ```
 
-`next dev` automatically boots the eve agent backend and proxies to it. Wait for `[eve:dev] server listening at ...` before chatting.
+The original upstream EveClaw implementation is retained while each surface is migrated to Hermes. `upstream` points to the source repository; `origin` points to Rob's fork.
 
-### Environment
+## Repository remotes
 
-See [`apps/eve/.env.example`](apps/eve/.env.example) for the full annotated list. The essentials:
-
-| Variable | Used for |
-| --- | --- |
-| `DATABASE_URL` | Neon Postgres (threads, reminders, webhooks, receipts, push) |
-| `SUPERMEMORY_API_KEY` | Long-term memory |
-| `COMPOSIO_API_KEY` | App integrations |
-| `BLOB_READ_WRITE_TOKEN` | File sharing + skill store |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | Web push notifications |
-| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET_TOKEN`, `TELEGRAM_ALLOWED_USER_IDS` | Telegram channel (optional) |
-
-## Scripts
-
-- `npm run dev` — dev servers (agent app on :3000, builder on :3100)
-- `npm run build` — production build
-- `npm run typecheck` — TypeScript checks + builder manifest completeness
-- `VERCEL_TOKEN=… DATABASE_URL=… npx tsx apps/builder/scripts/smoke-deploy.ts` — manual end-to-end deploy test (creates and deletes a real project)
-
-## Deploy
-
-Deployed to Vercel; the agent service is bundled into the same deployment and routed under `/eve/v1/**`.
+- Fork: `https://github.com/robdspain/eveclaw`
+- Upstream: `https://github.com/michaelshimeles/eveclaw`
