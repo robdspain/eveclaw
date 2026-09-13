@@ -1,5 +1,5 @@
-import { Chat } from "./chat";
+import HermesChat from "./hermes-chat";
 
 export default function Page() {
-  return <Chat />;
+  return <HermesChat />;
 }

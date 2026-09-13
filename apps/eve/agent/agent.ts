@@ -2,6 +2,8 @@ import type { LanguageModelMiddleware, ModelMessage } from "ai";
 import { gateway, wrapLanguageModel } from "ai";
 import { defineAgent, defineDynamic } from "eve";
 
+import { getHermesBridgeModel } from "@/lib/hermes-bridge-model";
+
 const DEFAULT_MODEL = "anthropic/claude-sonnet-5";
 
 const MODEL_ID_PATTERN = /^[\w.-]+\/[\w.:-]+$/;
@@ -83,12 +85,17 @@ export default defineAgent({
     fallback: DEFAULT_MODEL,
     events: {
       "turn.started": (_event, ctx) => requestedSettings(ctx.messages).model,
-      // Reasoning effort is a per-call AI SDK setting, not a field the dynamic
-      // model selection object accepts, so a requested level rides on a live
-      // gateway model wrapped with default settings. Live models are only
-      // allowed from step.started; with no level requested this returns null
-      // and the turn-scoped string selection (plain prompt-cache path) wins.
+      // Live models (Hermes bridge, or a reasoning-wrapped gateway model) are
+      // only allowed from step.started. The Hermes bridge — the Mac mini's
+      // native api_server gateway, OpenAI-compatible, confirmed live
+      // 2026-09-13 — takes priority whenever it's configured: it is the
+      // subscription-backed (no API keys) execution path this app is built
+      // around. Falls through to the AI Gateway path when the bridge isn't
+      // configured (e.g. local dev without a Mac-mini connection).
       "step.started": (_event, ctx) => {
+        const bridgeModel = getHermesBridgeModel();
+        if (bridgeModel) return bridgeModel;
+
         const { model, reasoning } = requestedSettings(ctx.messages);
         if (reasoning === null) return null;
         return wrapLanguageModel({
@@ -99,3 +106,4 @@ export default defineAgent({
     },
   }),
 });
+
