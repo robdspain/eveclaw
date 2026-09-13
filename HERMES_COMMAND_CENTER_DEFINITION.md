@@ -303,16 +303,21 @@ A connector card shows connected, needs reauth, unavailable, or disabled. OAuth 
 
 ### Netlify — live
 
-- Project: `hermes-command-center` (`https://hermes-command-center.netlify.app`), account `robdspain`/Behavior School, linked via `--filter hermes-command-center-web`.
+- Repository: `robdspain/hermes-command-center` (renamed from `robdspain/eveclaw`; `upstream` still points at `michaelshimeles/eveclaw`).
+- Project: `hermes-command-center` (`https://hermes-command-center.netlify.app`), account `robdspain`/Behavior School, linked via `apps/eve/.netlify/state.json` (`siteId: 1c886046-83d8-4966-806f-ef3cbe86d8ef`).
+- Auto-deploy: GitHub Actions build hook, not native Netlify GitHub App linking.
+  - `netlify init`'s GitHub authorization step requires an interactive browser OAuth prompt that cannot complete headlessly; it crashed the CLI (`ERR_USE_AFTER_CLOSE`) on every attempt.
+  - Instead: a Netlify build hook (`6aa68e4bb29ebef070131117`) was created via `netlify api createSiteBuildHook`, stored as the `NETLIFY_BUILD_HOOK_URL` GitHub Actions secret, and `.github/workflows/netlify-deploy.yml` POSTs to it on every push to `main`.
+  - Functionally equivalent to native auto-deploy for this repo's needs; revisit native GitHub App linking later if PR deploy previews are wanted (build hooks only cover push-to-main).
 - Environment variables set (2026-09-13):
   - `API_SERVER_KEY` — secret, `production` + `deploy-preview` contexts only, matches the key configured in `~/.hermes/config.yaml` `platforms.api_server.extra.api_key_env`.
   - `HERMES_BRIDGE_URL=http://100.77.85.60:8642` — Tailscale address of the Mac mini's `api_server` platform; not a public endpoint.
   - `HERMES_EXECUTION_MODE=bridge`
   - `NEXT_PUBLIC_AGENT_NAME=Hermes`, `NEXT_PUBLIC_OWNER_NAME=Rob`, `NEXT_PUBLIC_APP_NAME=Hermes Command Center`
-- No deploy has been triggered yet; the site is linked and configured but not built/published.
 - `netlify env:set --context all` silently no-ops for `--secret` values; secrets require an explicit `--context production`/`deploy-preview` flag. Confirmed via `netlify env:get ... --context production`.
 
 ### Netlify — remaining setup
+
 
 
 - Deploy `apps/eve` as the web app.

@@ -1,0 +1,19 @@
+name: Netlify auto-deploy
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: netlify-deploy-main
+  cancel-in-progress: true
+
+jobs:
+  trigger-netlify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Netlify build hook
+        run: |
+          curl -sf -X POST "${{ secrets.NETLIFY_BUILD_HOOK_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{"trigger_title":"github-actions:${{ github.sha }}"}'
