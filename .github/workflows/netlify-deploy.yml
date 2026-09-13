@@ -17,7 +17,9 @@ jobs:
         with:
           node-version: 24
       - run: npm ci
-      - run: npx netlify-cli deploy --prod --build --filter hermes-command-center-web
+      - name: Deploy to Netlify
+        working-directory: apps/eve
+        run: npx netlify-cli deploy --prod --build
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: 1c886046-83d8-4966-806f-ef3cbe86d8ef
