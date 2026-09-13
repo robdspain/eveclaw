@@ -1,6 +1,7 @@
 [build]
+  base = "apps/eve"
   command = "npm run build"
-  publish = "apps/eve/.next"
+  publish = ".next"
 
 [build.environment]
   NODE_VERSION = "24"

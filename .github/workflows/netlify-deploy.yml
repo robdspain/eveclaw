@@ -9,11 +9,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  trigger-netlify:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Netlify build hook
-        run: |
-          curl -sf -X POST "${{ secrets.NETLIFY_BUILD_HOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            -d '{"trigger_title":"github-actions:${{ github.sha }}"}'
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx netlify-cli deploy --prod --build --filter hermes-command-center-web
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: 1c886046-83d8-4966-806f-ef3cbe86d8ef
