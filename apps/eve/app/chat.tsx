@@ -67,12 +67,12 @@ import {
 import { AGENT_NAME, OWNER_NAME } from "@/lib/identity";
 import { cn } from "@/lib/utils";
 
-const THREADS_KEY = "eve-web-threads";
-const SEEN_KEY = "eve-web-threads-seen";
-const LEGACY_CHAT_KEY = "eve-web-chat";
-const MODEL_KEY = "eve-web-model";
-const DEFAULT_MODEL_ID = "anthropic/claude-sonnet-5";
-const REASONING_KEY = "eve-web-reasoning";
+const THREADS_KEY = "hermes-web-threads";
+const SEEN_KEY = "hermes-web-threads-seen";
+const LEGACY_CHAT_KEY = "hermes-web-chat";
+const MODEL_KEY = "hermes-web-model";
+const DEFAULT_MODEL_ID = "anthropic/claude-sonnet-4-6";
+const REASONING_KEY = "hermes-web-reasoning";
 
 /**
  * Reasoning effort riding along with each turn. "default" sends nothing and
