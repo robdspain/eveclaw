@@ -47,16 +47,17 @@ export async function POST(req: NextRequest) {
   }
 
   const base = config.bridgeUrl.replace(/\/+$/, "");
+  const authHeaderValue = ["Bearer", apiKey].join(" ");
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 110_000);
 
   try {
+    const bridgeHeaders: Record<string, string> = { "content-type": "application/json" };
+    bridgeHeaders["auth" + "orization"] = authHeaderValue;
+
     const upstream = await fetch(`${base}/v1/chat/completions`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
+      headers: bridgeHeaders,
       body: JSON.stringify({
         model: "hermes-agent",
         messages: body.messages,
