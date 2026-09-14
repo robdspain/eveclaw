@@ -54,6 +54,7 @@ export default function AgentThread({
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [queued, setQueued] = useState<string[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const loadedRef = useRef(false);
 
@@ -83,79 +84,122 @@ export default function AgentThread({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages, agent.id]);
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || busy) return;
-    setError(null);
-    setInput("");
+  const runTurn = useCallback(
+    async (text: string, historyBase: Msg[]) => {
+      const userMsg: Msg = { id: uid(), role: "user", content: text };
+      const assistantId = uid();
+      setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }]);
+      setBusy(true);
+      setError(null);
 
-    const userMsg: Msg = { id: uid(), role: "user", content: text };
-    const assistantId = uid();
-    setMessages((prev) => [...prev, userMsg, { id: assistantId, role: "assistant", content: "" }]);
-    setBusy(true);
+      const system = agentSystemPrompt(agent);
+      const history = [
+        ...(system ? [{ role: "system" as const, content: system }] : []),
+        ...historyBase.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user" as const, content: text },
+      ];
 
-    const system = agentSystemPrompt(agent);
-    const history = [
-      ...(system ? [{ role: "system" as const, content: system }] : []),
-      ...messages.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user" as const, content: text },
-    ];
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+      try {
+        const res = await fetch("/api/hermes/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ messages: history }),
+          signal: controller.signal,
+        });
 
-    try {
-      const res = await fetch("/api/hermes/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history }),
-        signal: controller.signal,
-      });
+        if (!res.ok || !res.body) {
+          const detail = await res.json().catch(() => ({}));
+          throw new Error(detail.error ? `${detail.error}${detail.detail ? `: ${detail.detail}` : ""}` : `HTTP ${res.status}`);
+        }
 
-      if (!res.ok || !res.body) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail.error ? `${detail.error}${detail.detail ? `: ${detail.detail}` : ""}` : `HTTP ${res.status}`);
-      }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let finalContent = "";
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
 
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
 
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const payload = trimmed.slice(5).trim();
-          if (payload === "[DONE]") continue;
-          try {
-            const parsed = JSON.parse(payload);
-            const delta: string | undefined = parsed?.choices?.[0]?.delta?.content;
-            if (delta) {
-              setMessages((prev) =>
-                prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
-              );
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const payload = trimmed.slice(5).trim();
+            if (payload === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(payload);
+              const delta: string | undefined = parsed?.choices?.[0]?.delta?.content;
+              if (delta) {
+                finalContent += delta;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + delta } : m)),
+                );
+              }
+            } catch {
+              // ignore malformed chunk
             }
-          } catch {
-            // ignore malformed chunk
           }
         }
+        return { userMsg, assistantContent: finalContent };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Something went wrong";
+        setError(message);
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
+        return null;
+      } finally {
+        abortRef.current = null;
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
-      setMessages((prev) => prev.filter((m) => m.id !== assistantId));
-    } finally {
-      setBusy(false);
-      abortRef.current = null;
+    },
+    [agent],
+  );
+
+  // Task queue: while a turn is running, new sends are queued rather than
+  // interrupting the in-flight request. Each queued message shows in the
+  // thread immediately with a "queued" marker, then runs in order once the
+  // current turn completes.
+  const queueRef = useRef<string[]>([]);
+
+  const drainQueue = useCallback(
+    async (historySoFar: Msg[]) => {
+      if (queueRef.current.length === 0) {
+        setBusy(false);
+        return;
+      }
+      const next = queueRef.current.shift()!;
+      setQueued((q) => q.slice(1));
+      const result = await runTurn(next, historySoFar);
+      const updatedHistory = result
+        ? [...historySoFar, result.userMsg, { id: uid(), role: "assistant" as const, content: result.assistantContent }]
+        : historySoFar;
+      await drainQueue(updatedHistory);
+    },
+    [runTurn],
+  );
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text) return;
+    setInput("");
+
+    if (busy) {
+      // Already running a turn — queue this one instead of interrupting.
+      queueRef.current.push(text);
+      setQueued((q) => [...q, text]);
+      return;
     }
-  }, [input, busy, messages, agent]);
+
+    queueRef.current = [text];
+    setQueued([]);
+    setBusy(true);
+    await drainQueue(messages);
+  }, [input, busy, messages, drainQueue]);
 
   return (
     <div style={styles.page}>
@@ -176,6 +220,11 @@ export default function AgentThread({
             <div style={styles.bubbleContent}>{m.content || (busy && m.role === "assistant" ? "…" : "")}</div>
           </div>
         ))}
+        {queued.length > 0 && (
+          <div style={styles.queueNotice}>
+            ⏳ {queued.length} request{queued.length === 1 ? "" : "s"} queued — I&apos;ll handle {queued.length === 1 ? "it" : "them"} next.
+          </div>
+        )}
         {error && <div style={styles.error}>⚠ {error}</div>}
       </main>
 
@@ -191,11 +240,10 @@ export default function AgentThread({
           style={styles.input}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={`Ask ${agent.name}`}
-          disabled={busy}
+          placeholder={busy ? `${agent.name} is working — your message will be queued` : `Ask ${agent.name}`}
         />
-        <button type="submit" style={styles.micBtn} disabled={busy || !input.trim()} aria-label="Send">
-          {busy ? "…" : "🎙"}
+        <button type="submit" style={styles.micBtn} disabled={!input.trim()} aria-label="Send">
+          {busy ? "⏳" : "🎙"}
         </button>
       </form>
     </div>
@@ -264,8 +312,18 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "16px 16px 16px 4px",
     padding: "10px 14px",
   },
-  bubbleContent: { fontSize: 14.5, whiteSpace: "pre-wrap", lineHeight: 1.45 },
+  bubbleContent: { fontSize: 14.5, whiteSpace: "pre-wrap", lineHeight: 1.45, wordBreak: "break-word", overflowWrap: "anywhere" },
   error: { color: "#ff6b6b", fontSize: 13, padding: "6px 4px" },
+  queueNotice: {
+    alignSelf: "center",
+    color: "#a3a9b3",
+    background: "#171a20",
+    border: "1px solid #282d35",
+    borderRadius: 12,
+    padding: "8px 12px",
+    fontSize: 12.5,
+    textAlign: "center",
+  },
   composer: {
     display: "flex",
     alignItems: "center",

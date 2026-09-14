@@ -9,7 +9,7 @@ const COOKIE_NAME = "hermes-cc-auth";
  * Checks a signed-ish cookie set by /api/auth/login against
  * HERMES_CC_ACCESS_CODE (set in Netlify env, never in source).
  */
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Always allow the login page and its API route through.
