@@ -1,5 +1,5 @@
-import HermesChat from "./hermes-chat";
+import HomeScreen from "./home-screen";
 
 export default function Page() {
-  return <HermesChat />;
+  return <HomeScreen />;
 }
