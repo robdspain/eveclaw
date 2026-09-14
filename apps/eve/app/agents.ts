@@ -12,12 +12,17 @@ export interface AgentDef {
   color: string;
   glyph: "ghost" | "cloud" | "drop" | "bolt" | "spark";
   shape?: AgentShape;
+  face?: AgentFace;
   instructions?: string;
   routines?: Routine[];
   notifications?: boolean;
 }
 
 export type AgentShape = "circle" | "circle-outline" | "squircle" | "pill" | "triangle" | "hex" | "cloud" | "drop";
+
+export type AgentFace = "dot-eyes" | "happy" | "sleepy" | "wink" | "surprised" | "star" | "focused" | "none";
+
+export const FACE_OPTIONS: AgentFace[] = ["dot-eyes", "happy", "sleepy", "wink", "surprised", "star", "focused", "none"];
 
 export const SHAPE_OPTIONS: AgentShape[] = [
   "circle-outline",
