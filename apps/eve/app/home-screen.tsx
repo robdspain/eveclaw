@@ -1,26 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import AgentAvatar from "./agent-avatar";
-import { AGENTS } from "./agents";
+import AgentSettings from "./agent-settings";
+import { AgentDef, getAgents } from "./agents";
 import AgentThread, { ThreadPreview } from "./agent-thread";
+
+type View = { kind: "list" } | { kind: "thread"; agentId: string } | { kind: "settings"; agentId: string };
 
 /**
  * Home screen: a list of agent "bots", GrokBot-style. Tapping one opens its
- * own thread (agent-thread.tsx). Every agent runs on the same real Hermes
+ * thread; long-press-equivalent (settings icon in thread header) opens the
+ * per-agent edit/settings screen. Every agent runs on the same real Hermes
  * bridge underneath — this is a UI grouping, not separate sandboxes.
  */
 export default function HomeScreen() {
-  const [openAgentId, setOpenAgentId] = useState<string | null>(null);
+  const [agents, setAgents] = useState<AgentDef[]>(getAgents());
+  const [view, setView] = useState<View>({ kind: "list" });
   const [previews, setPreviews] = useState<Record<string, ThreadPreview>>({});
 
-  if (openAgentId) {
-    const agent = AGENTS.find((a) => a.id === openAgentId)!;
+  useEffect(() => {
+    setAgents(getAgents());
+  }, [view]);
+
+  if (view.kind === "settings") {
+    const agent = agents.find((a) => a.id === view.agentId) ?? agents[0];
+    return (
+      <AgentSettings
+        agent={agent}
+        onBack={() => setView({ kind: "thread", agentId: agent.id })}
+        onSaved={() => setAgents(getAgents())}
+      />
+    );
+  }
+
+  if (view.kind === "thread") {
+    const agent = agents.find((a) => a.id === view.agentId) ?? agents[0];
     return (
       <AgentThread
         agent={agent}
-        onBack={() => setOpenAgentId(null)}
+        onBack={() => setView({ kind: "list" })}
+        onOpenSettings={() => setView({ kind: "settings", agentId: agent.id })}
         onPreviewChange={(preview) => setPreviews((prev) => ({ ...prev, [agent.id]: preview }))}
       />
     );
@@ -37,15 +58,15 @@ export default function HomeScreen() {
       </header>
 
       <div style={styles.hero}>
-        <AgentAvatar agent={{ id: "general", name: "Hermes", color: "#e8933a", glyph: "cloud" }} size={110} />
+        <AgentAvatar agent={{ id: "general", name: "Hermes", color: "#e8933a", glyph: "cloud", shape: "cloud" }} size={110} />
         <div style={styles.heroName}>Rob</div>
       </div>
 
       <main style={styles.list}>
-        {AGENTS.map((agent) => {
+        {agents.map((agent) => {
           const preview = previews[agent.id];
           return (
-            <button key={agent.id} style={styles.row} onClick={() => setOpenAgentId(agent.id)}>
+            <button key={agent.id} style={styles.row} onClick={() => setView({ kind: "thread", agentId: agent.id })}>
               <AgentAvatar agent={agent} size={40} />
               <div style={styles.rowText}>
                 <div style={styles.rowTop}>

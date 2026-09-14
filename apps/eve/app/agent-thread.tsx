@@ -42,10 +42,12 @@ function formatTime(ts: number) {
 export default function AgentThread({
   agent,
   onBack,
+  onOpenSettings,
   onPreviewChange,
 }: {
   agent: AgentDef;
   onBack: () => void;
+  onOpenSettings: () => void;
   onPreviewChange: (preview: ThreadPreview) => void;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -162,7 +164,7 @@ export default function AgentThread({
         <AgentAvatar agent={agent} size={30} />
         <span style={styles.title}>{agent.name}</span>
         <div style={{ flex: 1 }} />
-        <button style={styles.iconBtn} aria-label="Devices">🖥</button>
+        <button style={styles.iconBtn} onClick={onOpenSettings} aria-label="Settings">⋯</button>
       </header>
 
       <main style={styles.thread}>
