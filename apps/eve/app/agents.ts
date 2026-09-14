@@ -47,6 +47,15 @@ export const COLOR_OPTIONS = [
 
 export const DEFAULT_AGENTS: AgentDef[] = [
   { id: "general", name: "Hermes", color: "#e8933a", glyph: "cloud", shape: "cloud" },
+  {
+    id: "team",
+    name: "Team",
+    color: "#8a5ee8",
+    glyph: "spark",
+    shape: "hex",
+    instructions:
+      "You are the Team coordinator lane. When a request has independent sub-parts, use delegate_task to run genuinely parallel subagents (not sequential tool calls) and combine their results — don't just talk about doing it, actually call the tool. Keep the final combined answer concise. For simple single-step requests, just answer directly without delegating.",
+  },
   { id: "study", name: "Study", color: "#ffffff", glyph: "ghost", shape: "circle" },
   { id: "newsletter", name: "Newsletter", color: "#8b8f96", glyph: "ghost", shape: "circle" },
   { id: "inbox", name: "Personal Inbox", color: "#2f8fe0", glyph: "drop", shape: "drop" },
