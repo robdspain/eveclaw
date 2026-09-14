@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import AgentRoster from "./agent-roster";
+
 type Role = "user" | "assistant";
 interface Msg {
   id: string;
@@ -89,57 +91,66 @@ export default function HermesChat() {
   }, [input, busy, messages]);
 
   return (
-    <div style={styles.page}>
-      <header style={styles.header}>
-        <span style={styles.dot} />
-        <span style={styles.title}>Hermes</span>
-        <span style={styles.subtitle}>running on your subscriptions, not API credits</span>
-      </header>
+    <div style={styles.shell}>
+      <AgentRoster busy={busy} />
+      <div style={styles.page}>
+        <header style={styles.header}>
+          <span style={styles.dot} />
+          <span style={styles.title}>Hermes</span>
+          <span style={styles.subtitle}>running on your subscriptions, not API credits</span>
+        </header>
 
-      <main style={styles.thread}>
-        {messages.length === 0 && (
-          <div style={styles.empty}>Say something to start a real Hermes run on the Mac mini.</div>
-        )}
-        {messages.map((m) => (
-          <div key={m.id} style={m.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}>
-            <div style={styles.bubbleRole}>{m.role === "user" ? "You" : "Hermes"}</div>
-            <div style={styles.bubbleContent}>{m.content || (busy && m.role === "assistant" ? "…" : "")}</div>
-          </div>
-        ))}
-        {error && <div style={styles.error}>⚠ {error}</div>}
-      </main>
+        <main style={styles.thread}>
+          {messages.length === 0 && (
+            <div style={styles.empty}>Say something to start a real Hermes run on the Mac mini.</div>
+          )}
+          {messages.map((m) => (
+            <div key={m.id} style={m.role === "user" ? styles.bubbleUser : styles.bubbleAssistant}>
+              <div style={styles.bubbleRole}>{m.role === "user" ? "You" : "Hermes"}</div>
+              <div style={styles.bubbleContent}>{m.content || (busy && m.role === "assistant" ? "…" : "")}</div>
+            </div>
+          ))}
+          {error && <div style={styles.error}>⚠ {error}</div>}
+        </main>
 
-      <form
-        style={styles.composer}
-        onSubmit={(e) => {
-          e.preventDefault();
-          send();
-        }}
-      >
-        <input
-          style={styles.input}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Message Hermes…"
-          disabled={busy}
-        />
-        <button type="submit" style={styles.sendBtn} disabled={busy || !input.trim()}>
-          {busy ? "…" : "Send"}
-        </button>
-      </form>
+        <form
+          style={styles.composer}
+          onSubmit={(e) => {
+            e.preventDefault();
+            send();
+          }}
+        >
+          <input
+            style={styles.input}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Message Hermes…"
+            disabled={busy}
+          />
+          <button type="submit" style={styles.sendBtn} disabled={busy || !input.trim()}>
+            {busy ? "…" : "Send"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
 
 const styles: Record<string, React.CSSProperties> = {
+  shell: {
+    display: "flex",
+    height: "100dvh",
+    background: "#0b0d10",
+  },
   page: {
     display: "flex",
     flexDirection: "column",
-    height: "100dvh",
-    background: "#0b0d10",
+    flex: 1,
+    minWidth: 0,
     color: "#e8e8ec",
     fontFamily: "system-ui, -apple-system, sans-serif",
   },
+
   header: {
     display: "flex",
     alignItems: "baseline",
