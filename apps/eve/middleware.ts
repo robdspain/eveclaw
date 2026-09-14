@@ -26,12 +26,16 @@ export function middleware(req: NextRequest) {
 
   const cookie = req.cookies.get(COOKIE_NAME)?.value;
   if (cookie === expected) {
-    return NextResponse.next();
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store");
+    return res;
   }
 
   const loginUrl = new URL("/login", req.url);
   loginUrl.searchParams.set("next", pathname);
-  return NextResponse.redirect(loginUrl);
+  const redirect = NextResponse.redirect(loginUrl);
+  redirect.headers.set("Cache-Control", "no-store");
+  return redirect;
 }
 
 export const config = {
